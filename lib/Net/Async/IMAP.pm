@@ -1,12 +1,36 @@
-package Net::Async::IMAP;
-# ABSTRACT: Do stuff
+package Net::Async::IMAP::Client;
+# ABSTRACT: Asynchronous IMAP client
 use strict;
-use warnings FATAL => 'all', NONFATAL => 'redefine';
-use 5.10.0;
+use warnings;
+use parent qw{IO::Async::Protocol::Stream Protocol::IMAP::Client};
 
-our $VERSION = '1.000';
+our $VERSION = '0.001';
 
-=pod
+=head1 NAME
+
+Net::Async::IMAP::Client - asynchronous IMAP client based on L<Protocol::IMAP::Client> and L<IO::Async::Protocol::Stream>.
+
+=head1 SYNOPSIS
+
+ use IO::Async::Loop;
+ use Net::Async::IMAP;
+ my $loop = IO::Async::Loop->new;
+ my $imap = Net::Async::IMAP::Client->new(
+ 	loop => $loop,
+	host => 'mailserver.com',
+	service => 'imap',
+	user => 'user@mailserver.com',
+	pass => 'password',
+	on_authenticated => sub {
+		warn "login was successful";
+		$loop->loop_stop;
+	},
+ );
+ $loop->loop_forever;
+
+=head1 DESCRIPTION
+
+=head1 METHODS
 
 =cut
 
