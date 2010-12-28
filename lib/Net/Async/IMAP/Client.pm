@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use parent qw{IO::Async::Protocol::Stream Protocol::IMAP::Client};
 
+use IO::Async::SSL;
 use Socket;
 our $VERSION = '0.001';
 
@@ -87,9 +88,11 @@ sub configure {
 	my %args = @_;
 
 # Debug flag is used to control the copious amounts of data that we dump out when tracing
-	$self->{debug} = delete $args{debug} ? 1 : 0;
+	if(exists $args{debug}) {
+		$self->{debug} = delete $args{debug} ? 1 : 0;
+	}
 
-	die "No host provided" unless $args{host};
+	# die "No host provided" unless $args{host} || $self->{transport};
 	foreach (qw{host service user pass ssl tls}) {
 		$self->{$_} = delete $args{$_} if exists $args{$_};
 	}
@@ -127,6 +130,42 @@ sub on_connection_established {
 	my $loop = $self->get_loop or die "No IO::Async::Loop available";
 	$loop->add($transport);
 	$self->debug("Have transport " . $self->transport);
+}
+
+sub on_capability {
+	my $self = shift;
+	my $caps = shift;
+	
+	$self->starttls if $caps->{STARTTLS};
+}
+
+sub on_starttls {
+	my $self = shift;
+	$self->debug("Upgrading to TLS");
+
+# Most of this taken directly from IO::Async::SSL, since we seem to be attempting to remove the transport from the list of children
+# when doing the regular upgrade via ->configure(transport => undef) here.
+	require IO::Async::SSLStream;
+
+	my $socket = $self->transport->read_handle;
+	undef $self->{transport};
+
+	$self->get_loop->SSL_upgrade(
+		handle => $socket,
+		on_upgraded => $self->_capture_weakself(sub {
+			my ($self, $newsocket) = @_;
+			$self->debug("TLS upgrade complete");
+
+			my $sslstream = IO::Async::SSLStream->new(
+				handle => $newsocket,
+			);
+			$self->{tls_enabled} = 1;
+
+			$self->configure(transport => $sslstream);
+			$self->get_capabilities;
+		}),
+		on_error => sub { die "error @_"; }
+	);
 }
 
 =head2 C<start_idle_timer>
