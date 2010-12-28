@@ -16,7 +16,7 @@ my $loop = IO::Async::Loop->new;
 # should make the connection for us and call the on_authenticated callback.
 my $imap = Net::Async::IMAP::Client->new(
 # Set the debug flag to 1 to see lots of tedious detail about what's happening.
-	debug			=> 0,
+	debug			=> 1,
 	host			=> $ENV{NET_ASYNC_IMAP_SERVER},
 	service			=> $ENV{NET_ASYNC_IMAP_PORT} || 'imap',
 	user			=> $ENV{NET_ASYNC_IMAP_USER},
