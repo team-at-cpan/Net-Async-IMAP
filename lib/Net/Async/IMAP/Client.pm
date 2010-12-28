@@ -132,13 +132,6 @@ sub on_connection_established {
 	$self->debug("Have transport " . $self->transport);
 }
 
-sub on_capability {
-	my $self = shift;
-	my $caps = shift;
-	
-	$self->starttls if $caps->{STARTTLS};
-}
-
 sub on_starttls {
 	my $self = shift;
 	$self->debug("Upgrading to TLS");
