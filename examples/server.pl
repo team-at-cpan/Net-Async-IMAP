@@ -31,5 +31,6 @@ $listener->listen(
 	on_resolve_error => sub { die "Cannot resolve - $_[0]\n"; },
 	on_listen_error  => sub { die "Cannot listen\n"; },
 );
+warn "Listening for connections\n";
 $loop->loop_forever;
 
