@@ -1,8 +1,7 @@
-package Net::Async::IMAP::Client;
+package Net::Async::IMAP;
 # ABSTRACT: Asynchronous IMAP client
 use strict;
 use warnings;
-use parent qw{IO::Async::Protocol::Stream Protocol::IMAP::Client};
 
 our $VERSION = '0.001';
 
