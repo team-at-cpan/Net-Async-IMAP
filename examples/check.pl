@@ -6,53 +6,65 @@ use IO::Async::Loop;
 use IO::Async::Timer::Countdown;
 use Net::Async::IMAP::Client;
 
+# Use one of the Perl Email Project modules for handling the email parsing. This one's good enough for our needs.
 use Email::Simple;
 
+# Standard event loop creation
 my $loop = IO::Async::Loop->new;
+
+# We create a new client instance, passing the information needed to connect - when the event loop starts, this
+# should make the connection for us and call the on_authenticated callback.
 my $imap = Net::Async::IMAP::Client->new(
-	debug			=> 1,
+# Set the debug flag to 1 to see lots of tedious detail about what's happening.
+	debug			=> 0,
 	host			=> $ENV{NET_ASYNC_IMAP_SERVER},
 	service			=> $ENV{NET_ASYNC_IMAP_PORT} || 'imap',
 	user			=> $ENV{NET_ASYNC_IMAP_USER},
 	pass			=> $ENV{NET_ASYNC_IMAP_PASS},
-	on_authenticated	=> sub {
-		checkServer();
-	},
+	on_authenticated	=> \&check_server,
 );
 
+# First task is to check the status for the mailbox
 my $total;
-sub checkServer {
+my $cur = 1;
+sub check_server {
 	$imap->status(
 		on_ok => sub {
 			my $data = shift;
+# Store the total number of messages and report what we found
 			$total = $data->{messages};
 			warn "Message count: " . $data->{messages} . ", next: " . $data->{uidnext} . "\n";
-			selectMailbox();
+# Then pass on to the next task in the list - you should probably weaken a copy of $imap here
+			$imap->select(
+				mailbox => 'INBOX',
+				on_ok => sub {
+					return unless $total > $cur;
+					fetch_message(++$cur);
+				}
+			);
 		}
 	);
 }
 
-my $cur = 1;
-sub selectMailbox {
-	$imap->select(
-		mbox => 'INBOX',
-		on_ok => sub {
-			fetchNewMessage(3);
-		}
-	);
-}
-
-sub fetchNewMessage {
+sub fetch_message {
 	my $idx = shift;
 	$imap->fetch(
+# Provide the ID for the message to fetch here - one-based, not zero-based!
 		message => $idx,
-		type => 'RFC822.TEXT',
+
+# Specify which parts of the message you want - if you only need subject/from/to etc., then just ask for the headers
+		type => 'RFC822.HEADER',
+		# type => 'RFC822.HEADER RFC822.TEXT',
 		on_ok => sub {
 			my $msg = shift;
-#			print $msg;
+
 			my $es = Email::Simple->new($msg);
-			warn sprintf("[%03d] %s\n", $idx, $es->header('Subject'));
-			$loop->loop_stop;
+			printf("[%03d] %s\n", $idx, $es->header('Subject'));
+			if($cur < $total) {
+				fetch_message(++$cur);
+			} else {
+				$loop->loop_stop;
+			}
 		}
 	);
 }
