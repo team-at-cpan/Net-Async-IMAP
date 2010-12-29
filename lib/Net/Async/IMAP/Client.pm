@@ -22,22 +22,35 @@ Net::Async::IMAP::Client - asynchronous IMAP client based on L<Protocol::IMAP::C
 	service => 'imap',
 	user => 'user@mailserver.com',
 	pass => 'password',
-	on_authenticated => sub {
-		warn "login was successful";
-		$loop->loop_stop;
+
+# Automatically retrieve any new messages that arrive on the server
+	on_message_received => sub {
+		my ($self, $id) = @_;
+		$self->fetch($id);
+	},
+
+# Display the subject whenever we have a successful FETCH command
+	on_message => sub {
+		my ($self, $msg) = @_;
+		warn "Had message " . Email::Simple->new($msg)->header('Subject') . "\n";
 	},
  );
  $loop->loop_forever;
 
 =head1 DESCRIPTION
 
+Provides support for communicating with IMAP servers under L<IO::Async>.
+
+See L<Protocol::IMAP> for more details on this implementation of IMAP, and RFC3501
+for the official protocol specification.
+
 =head1 METHODS
 
 =cut
 
-=head2 C<new>
+=head2 new
 
-Instantiate a new object. Will add to the event loop if the C<loop> parameter is passed.
+Instantiate a new object. Will add to the event loop if the loop parameter is passed.
 
 =cut
 
@@ -55,7 +68,7 @@ sub new {
 	return $self;
 }
 
-=head2 C<on_read>
+=head2 on_read
 
 Pass any new data into the protocol handler.
 
@@ -77,7 +90,7 @@ sub on_read {
 	return 0;
 }
 
-=head2 C<configure>
+=head2 configure
 
 Apply callbacks and other parameters, preparing state for event loop start.
 
@@ -104,19 +117,12 @@ sub configure {
 	return $self;
 }
 
-sub on_user {
-	my $self = shift;
-	return $self->{user};
-}
+sub on_user { shift->{user} }
+sub on_pass { shift->{pass} }
 
-sub on_pass {
-	my $self = shift;
-	return $self->{pass};
-}
+=head2 on_connection_established
 
-=head2 C<on_connection_established>
-
-
+Prepare and activate a new transport.
 
 =cut
 
@@ -132,12 +138,19 @@ sub on_connection_established {
 	$self->debug("Have transport " . $self->transport);
 }
 
+=head2 on_starttls
+
+Upgrade the underlying stream to use TLS.
+
+=cut
+
 sub on_starttls {
 	my $self = shift;
 	$self->debug("Upgrading to TLS");
 
 # Most of this taken directly from IO::Async::SSL, since we seem to be attempting to remove the transport from the list of children
-# when doing the regular upgrade via ->configure(transport => undef) here.
+# when doing the regular upgrade via ->configure(transport => undef) here. Could be something to do with the dodgy code in
+# L<_add_to_loop>.
 	require IO::Async::SSLStream;
 
 	my $socket = $self->transport->read_handle;
@@ -161,7 +174,7 @@ sub on_starttls {
 	);
 }
 
-=head2 C<start_idle_timer>
+=head2 start_idle_timer
 
 =cut
 
@@ -191,7 +204,7 @@ sub start_idle_timer {
 	return $self;
 }
 
-=head2 C<stop_idle_timer>
+=head2 stop_idle_timer
 
 Disable the timer if it's running.
 
@@ -202,7 +215,11 @@ sub stop_idle_timer {
 	$self->{idle_timer}->stop if $self->{idle_timer};
 }
 
-=head2 C<_add_to_loop>
+=head2 _add_to_loop
+
+Set up the connection automatically when we are added to the loop.
+
+TODO: this is probably the wrong way to go about things, move this somewhere more appropriate.
 
 =cut
 
@@ -215,9 +232,9 @@ sub _add_to_loop {
 	$self->state(Protocol::IMAP::ConnectionClosed);
 	Scalar::Util::weaken(my $weakSelf = $self);
 	$loop->connect(
-		host => $self->{host},
-		service => $self->{service} || 'imap2',
-		socktype => SOCK_STREAM,
+		host		=> $self->{host},
+		service		=> $self->{service} || 'imap2',
+		socktype	=> SOCK_STREAM,
 		on_resolve_error => sub {
 			die "Resolution failed for $host";
 		},
