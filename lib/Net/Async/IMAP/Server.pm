@@ -4,6 +4,7 @@ use warnings;
 use parent qw{IO::Async::Protocol::Stream Protocol::IMAP::Server};
 
 use Socket;
+our $VERSION = '0.002';
 
 =head1 NAME
 

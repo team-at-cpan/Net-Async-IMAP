@@ -1,11 +1,11 @@
 package Net::Async::IMAP::Client;
 use strict;
 use warnings;
-use parent qw{IO::Async::Protocol::Stream Protocol::IMAP::Client};
+use parent qw{IO::Async::Protocol::LineStream Protocol::IMAP::Client};
 
 use IO::Async::SSL;
 use Socket;
-our $VERSION = '0.001';
+our $VERSION = '0.002';
 
 =head1 NAME
 
@@ -19,7 +19,7 @@ Net::Async::IMAP::Client - asynchronous IMAP client based on L<Protocol::IMAP::C
  my $imap = Net::Async::IMAP::Client->new(
  	loop => $loop,
 	host => 'mailserver.com',
-	service => 'imap',
+	service => 10143, # custom port number example
 	user => 'user@mailserver.com',
 	pass => 'password',
 
@@ -70,6 +70,7 @@ sub new {
 
 sub _init {
 	my $self = shift;
+	$self->SUPER::_init(@_);
 
 	$self->{idle_timer} = IO::Async::Timer::Countdown->new(
 		delay => 25 * 60,
@@ -90,26 +91,35 @@ sub _init {
 	$self->add_child( $self->{idle_timer} );
 }
 
-=head2 on_read
+=head2 on_read_line
 
 Pass any new data into the protocol handler.
 
 =cut
 
-sub on_read {
-	my ($self, $buffref, $closed) = @_;
-	$self->debug("Stream was closed, this was not expected") if $closed;
+sub on_read_line {
+	my ($self, $line) = @_;
+	$self->debug("Have line [$line]");
+	my $remaining = $self->on_single_line($line);
+	return 1 unless $remaining;
 
-# We'll be called again, don't know where, don't know when, but the rest of our data will be waiting for us
-	if($$buffref =~ s/^(.*[\n\r]+)//) {
-		if($self->is_multi_line) {
-			$self->on_multi_line($1);
-		} else {
-			$self->on_single_line($1);
-		}
-		return 1;
-	}
-	return 0;
+# Switch to multi-line (fixed data size) mode
+	return $self->_capture_weakself(sub {
+		my $self = shift;
+		my ($stream, $buffref, $closed) = @_;
+
+		$self->debug("Have length [" . length($$buffref) . "] expecting $remaining");
+		# Allow buffer to build up until we have the entire response
+		return 0 unless length $$buffref >= $remaining;
+
+		# Extract full buffer and pass it on to the multiline handler
+		my $data = substr($$buffref, 0, $remaining, '');
+		$self->on_multi_line($data);
+
+		# On completion drop back to the previous handler
+		delete $self->{multiline};
+		return undef;
+	});
 }
 
 =head2 configure
@@ -157,7 +167,7 @@ sub on_connection_established {
 	my $sock = shift;
 	my $transport = IO::Async::Stream->new(handle => $sock)
 		or die "No transport?";
-	$self->configure( transport => $transport );
+	$self->configure(transport => $transport);
 	$self->debug("Have transport " . $self->transport);
 }
 
@@ -186,6 +196,8 @@ sub on_starttls {
 }
 
 =head2 start_idle_timer
+
+Restart the idle timer.
 
 =cut
 
