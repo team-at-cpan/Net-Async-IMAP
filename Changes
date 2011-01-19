@@ -1,4 +1,5 @@
 {{$NEXT}}
+	Support perl5.8 and update IO::Async minimum version required to 0.36 since we're relying on LineStream now.
 
 0.002     2011-01-05 03:07:40 Europe/London
 	Applied some suggested code changes from PEVANS, which among other things have cleaned up the transport handling and TLS upgrade.

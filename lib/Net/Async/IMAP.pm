@@ -3,7 +3,7 @@ package Net::Async::IMAP;
 use strict;
 use warnings;
 
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 1;
 
@@ -46,5 +46,5 @@ improvements to the initial implementation of this module.
 
 =head1 LICENSE
 
-Licensed under the same terms as Perl itself.
+Copyright Tom Molesworth 2010-2011. Licensed under the same terms as Perl itself.
 

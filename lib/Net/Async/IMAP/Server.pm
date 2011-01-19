@@ -4,7 +4,7 @@ use warnings;
 use parent qw{IO::Async::Protocol::Stream Protocol::IMAP::Server};
 
 use Socket;
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 =head1 NAME
 
@@ -29,6 +29,8 @@ Net::Async::IMAP::Server - asynchronous IMAP server based on L<Protocol::IMAP::S
  $loop->loop_forever;
 
 =head1 DESCRIPTION
+
+See L<Protocol::IMAP::Server> for more details on API.
 
 =head1 METHODS
 
@@ -121,7 +123,7 @@ sub start_idle_timer {
 
 	$self->{idle_timer}->stop if $self->{idle_timer};
 	$self->{idle_timer} = IO::Async::Timer::Countdown->new(
-		delay => $args{idle_timeout} // 25 * 60,
+		delay => $args{idle_timeout} || 25 * 60,
 		on_expire => $self->_capture_weakself( sub {
 			my $self = shift;
 			$self->done(
@@ -153,3 +155,14 @@ sub stop_idle_timer {
 }
 
 1;
+
+__END__
+
+=head1 AUTHOR
+
+Tom Molesworth <net-async-imap@entitymodel.com>
+
+=head1 LICENSE
+
+Copyright Tom Molesworth 2010-2011. Licensed under the same terms as Perl itself.
+

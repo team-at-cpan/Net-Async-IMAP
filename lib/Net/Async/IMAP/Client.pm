@@ -5,7 +5,7 @@ use parent qw{IO::Async::Protocol::LineStream Protocol::IMAP::Client};
 
 use IO::Async::SSL;
 use Socket;
-our $VERSION = '0.002';
+our $VERSION = '0.003';
 
 =head1 NAME
 
@@ -272,3 +272,14 @@ sub connect {
 }
 
 1;
+
+__END__
+
+=head1 AUTHOR
+
+Tom Molesworth <net-async-imap@entitymodel.com>
+
+=head1 LICENSE
+
+Copyright Tom Molesworth 2010-2011. Licensed under the same terms as Perl itself.
+
