@@ -3,7 +3,6 @@ use strict;
 use warnings;
 use parent qw{IO::Async::Protocol::LineStream Protocol::IMAP::Client};
 
-use IO::Async::SSL;
 use Socket;
 our $VERSION = '0.003';
 
