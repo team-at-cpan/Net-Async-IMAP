@@ -65,7 +65,9 @@ sub fetch_message {
 			my $msg = shift;
 
 			my $es = Email::Simple->new($msg);
+			my $hdr = $es->header_obj;
 			printf("[%03d] %s\n", $idx, $es->header('Subject'));
+			printf(" - %s\n", join(',', $hdr->header_names));
 			if($cur < $total) {
 				fetch_message(++$cur);
 			} else {
