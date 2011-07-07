@@ -5,6 +5,7 @@ use warnings;
 use IO::Async::Loop;
 use IO::Async::Timer::Countdown;
 use Net::Async::IMAP::Client;
+use IO::Async::SSL;
 
 # Use one of the Perl Email Project modules for handling the email parsing. This one's good enough for our needs.
 use Email::Simple;
@@ -20,12 +21,14 @@ my $cur = 1;
 # should make the connection for us and call the on_authenticated callback.
 my $imap = Net::Async::IMAP::Client->new(
 	# Set the debug flag to 1 to see lots of tedious detail about what's happening.
-	debug			=> 0,
+	debug			=> 1,
 	host			=> $ENV{NET_ASYNC_IMAP_SERVER},
 	service			=> $ENV{NET_ASYNC_IMAP_PORT} || 'imap',
 	user			=> $ENV{NET_ASYNC_IMAP_USER},
 	pass			=> $ENV{NET_ASYNC_IMAP_PASS},
 	on_authenticated	=> \&check_server,
+	on_message		=> sub { warn "@_\n"; },
+	on_message_received	=> sub { warn "recv @_\n"; },
 );
 
 $loop->add($imap);
@@ -71,7 +74,12 @@ sub fetch_message {
 			if($cur < $total) {
 				fetch_message(++$cur);
 			} else {
-				$loop->loop_stop;
+				$imap->noop(
+					on_ok => sub {
+						$imap->idle;
+					}
+				);
+#				$loop->loop_stop;
 			}
 		}
 	);
