@@ -182,16 +182,26 @@ sub on_starttls {
 
 	require IO::Async::SSLStream;
 
+	my $f = Future->new;
 	$self->SSL_upgrade(
-		on_upgraded => $self->_capture_weakself(sub {
-			my ($self) = @_;
-			$self->debug("TLS upgrade complete");
-
-			$self->{tls_enabled} = 1;
-			$self->get_capabilities;
-		}),
-		on_error => sub { die "error @_"; }
+		on_upgraded => $self->curry::weak::on_tls_upgraded($f),
+		on_error => $f->curry::weak::fail,
 	);
+}
+
+sub on_tls_upgraded {
+	my $self = shift;
+	my $f = shift;
+	$self->debug("TLS upgrade complete");
+
+	$self->{tls_enabled} = 1;
+	$self->get_capabilities;
+}
+
+sub on_tls_upgrade_failure {
+	my $self = shift;
+	my $f = shift;
+	$f->fail(@_);
 }
 
 =head2 start_idle_timer
@@ -223,12 +233,6 @@ sub stop_idle_timer {
 =head2 _add_to_loop
 
 Set up the connection automatically when we are added to the loop.
-
-TODO: this is probably the wrong way to go about things, move this somewhere more appropriate.
-
-TODO(pe): Ish... It would be nice if the IO::Async::Protocol could manage an
-automatic ->connect call
-
 =cut
 
 sub _add_to_loop {
@@ -276,9 +280,9 @@ __END__
 
 =head1 AUTHOR
 
-Tom Molesworth <net-async-imap@entitymodel.com>
+Tom Molesworth <cpan@entitymodel.com>
 
 =head1 LICENSE
 
-Copyright Tom Molesworth 2010-2011. Licensed under the same terms as Perl itself.
+Copyright Tom Molesworth 2010-2013. Licensed under the same terms as Perl itself.
 
