@@ -1,8 +1,9 @@
 package Net::Async::IMAP::Client;
 use strict;
 use warnings;
-use parent qw{IO::Async::Protocol::LineStream Protocol::IMAP::Client};
+use parent qw(IO::Async::Notifier);
 
+# Net::Async::CassandraCQL
 use Socket;
 our $VERSION = '0.003';
 
@@ -49,21 +50,14 @@ for the official protocol specification.
 
 =head2 new
 
-Instantiate a new object. Will add to the event loop if the loop parameter is passed.
+Instantiate a new object.
 
 =cut
 
 sub new {
 	my $class = shift;
 	my %args = @_;
-
-# Clear any options that will cause the parent class to complain
-	my $loop = delete $args{loop};
-
 	my $self = $class->SUPER::new( %args );
-
-# Automatically add to the event loop if we were passed one
-	$loop->add($self) if $loop;
 	return $self;
 }
 
@@ -145,10 +139,9 @@ sub configure {
 		$self->{idle_timer}->configure( delay => delete $args{idle_timeout} );
 	}
 
-
-# Don't think I like this much, but didn't want the list of callbacks held here
-	%args = $self->Protocol::IMAP::Client::configure(%args);
-
+#	# Don't think I like this much, but didn't want the list of callbacks held here
+#	%args = $self->Protocol::IMAP::Client::configure(%args);
+#
 	$self->SUPER::configure(%args);
 }
 
@@ -233,6 +226,7 @@ sub stop_idle_timer {
 =head2 _add_to_loop
 
 Set up the connection automatically when we are added to the loop.
+
 =cut
 
 sub _add_to_loop {
@@ -253,24 +247,25 @@ sub connect {
 	my %args = @_;
 
 	my $on_connected = delete $args{on_connected};
-	$self->state(Protocol::IMAP::ConnectionClosed);
+#	$self->state('ConnectionClosed');
 	my $host = exists $args{host} ? delete $args{host} : $self->{host};
 	$self->SUPER::connect(
+		# Default value
 		service		=> 'imap2',
 		%args,
 		host		=> $host,
 		socktype	=> SOCK_STREAM,
-		on_resolve_error => sub {
-			die "Resolution failed for $host";
-		},
-		on_connect_error => sub {
-			die "Could not connect to $host";
-		},
-		on_connected => sub {
-			my ($self, $sock) = @_;
-			$self->state(Protocol::IMAP::ConnectionEstablished, $self->transport->read_handle);
-			$on_connected->($self) if $on_connected;
-		}
+#		on_resolve_error => sub {
+#			die "Resolution failed for $host";
+#		},
+#		on_connect_error => sub {
+#			die "Could not connect to $host";
+#		},
+#		on_connected => sub {
+#			my ($self, $sock) = @_;
+#			$self->state(ConnectionEstablished => $self->transport->read_handle);
+#			$on_connected->($self) if $on_connected;
+#		}
 	);
 }
 

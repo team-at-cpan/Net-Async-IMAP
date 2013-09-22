@@ -46,5 +46,5 @@ improvements to the initial implementation of this module.
 
 =head1 LICENSE
 
-Copyright Tom Molesworth 2010-2011. Licensed under the same terms as Perl itself.
+Copyright Tom Molesworth 2010-2013. Licensed under the same terms as Perl itself.
 

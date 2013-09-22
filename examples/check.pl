@@ -1,11 +1,11 @@
-#!/usr/bin/perl 
+#!/usr/bin/env perl 
 use strict;
 use warnings;
 
 use IO::Async::Loop;
 use IO::Async::Timer::Countdown;
-use Net::Async::IMAP::Client;
 use IO::Async::SSL;
+use Net::Async::IMAP::Client;
 
 # Use one of the Perl Email Project modules for handling the email parsing. This one's good enough for our needs.
 use Email::Simple;
@@ -33,7 +33,7 @@ my $imap = Net::Async::IMAP::Client->new(
 
 $loop->add($imap);
 
-$loop->loop_forever;
+$loop->run;
 
 # First task is to check the status for the mailbox
 sub check_server {
