@@ -103,25 +103,31 @@ sub authenticated { shift->{authenticated} ||= Future->new }
 sub status { $_[0]->protocol->status(@_[1..$#_]) }
 sub select : method { $_[0]->protocol->select(@_[1..$#_]) }
 sub fetch : method { $_[0]->protocol->fetch(@_[1..$#_]) }
+sub list : method { $_[0]->protocol->list(@_[1..$#_]) }
 
 package main;
 use IO::Async::Loop;
 use Email::Simple;
 use Try::Tiny;
 use Future::Utils;
+use Date::Parse qw(str2time);
+use POSIX qw(strftime);
+
+binmode STDOUT, ':encoding(UTF-8)';
+binmode STDERR, ':encoding(UTF-8)';
 
 my $loop = IO::Async::Loop->new;
 my $imap = Net::Async::IMAP::Client->new;
 $loop->add($imap);
 $imap->connect(
-#	user     => 'tom@entitymodel.com',
-#	pass     => 'd3m0n1c',
-#	host     => 'audioboundary.com',
-#	service  => 'imap2',
-	user     => 'trendeu\\tom_molesworth',
-	pass     => 'PhuSee2v',
-	host     => 'localhost',
-	service  => '9143',
+	user     => 'tom@audioboundary.com',
+	pass     => 'd3m0n1c',
+	host     => 'audioboundary.com',
+	service  => 'imap2',
+#	user     => 'trendeu\\tom_molesworth',
+#	pass     => 'PhuSee2v',
+#	host     => 'localhost',
+#	service  => '9143',
 	socktype => 'stream',
 )->on_done(sub {
 	my $imap = shift;
@@ -132,13 +138,16 @@ $imap->connect(
 })->on_fail(sub {
 	warn "Failed to connect: @_\n"
 });
-my $idx = 1;
+my $idx = 3940;
 my $f = $imap->authenticated->then(sub {
 	warn "Authentication seems to have finished";
 	$imap->status
 })->then(sub {
 	warn "Status ready:\n";
 	my $status = shift;
+	$imap->list(
+	)
+})->then(sub {
 #	use Data::Dumper; warn Dumper($status);
 	$imap->select(
 		mailbox => 'INBOX'
@@ -147,31 +156,42 @@ my $f = $imap->authenticated->then(sub {
 	warn "Select complete: @_";
 	my $status = shift;
 	use Data::Dumper; warn Dumper($status);
-	Future::Utils::repeat {
+#	Future::Utils::repeat {
+	my $total = 0;
+	my $max = $status->{messages} // 27;
 		$imap->fetch(
-			message => "$idx",
+			message => $idx . ":" . $max,
 #			message => "1,2,3,4",
 			# type => 'RFC822.HEADER',
-			# type => 'BODY[HEADER]',
+			# type => 'BODY',
+			# type => 'BODY[]',
 			type => 'ALL',
-		)->on_done(sub {
-			my $msg = shift;
+#			type => '(FLAGS INTERNALDATE RFC822.SIZE ENVELOPE BODY[])',
+			on_fetch => sub {
+				my $msg = shift;
 
-			try {
-				$msg->data('envelope')->on_done(sub {
-					my $envelope = shift;
-					printf "%4d %-64.64s %-64.64s\n", $idx, $envelope->date, $envelope->subject;
-#					say "Message ID: " . $envelope->message_id;
-#					say "Subject:    " . $envelope->subject;
-#					say "Date:       " . $envelope->date;
-#					say "From:       " . join ',', $envelope->from;
-#					say "To:         " . join ',', $envelope->to;
-#					say "CC:         " . join ',', $envelope->cc;
-#					say "BCC:        " . join ',', $envelope->bcc;
-				});
-			} catch { warn "failed: $_" };
-		})->on_fail(sub { warn "failed fetch - @_" });
-	} while => sub { ++$idx < $status->{messages} };
+				try {
+					my $size = $msg->data('size')->get;
+					$msg->data('envelope')->on_done(sub {
+						my $envelope = shift;
+						my $date = strftime '%Y-%m-%d %H:%M:%S', localtime str2time($envelope->date);
+						printf "%4d %-20.20s %8d %-64.64s\n", $idx, $date, $size, Encode::decode('IMAP-UTF-7' => $envelope->subject);
+	#					say "Message ID: " . $envelope->message_id;
+	#					say "Subject:    " . $envelope->subject;
+	#					say "Date:       " . $envelope->date;
+	#					say "From:       " . join ',', $envelope->from;
+	#					say "To:         " . join ',', $envelope->to;
+	#					say "CC:         " . join ',', $envelope->cc;
+	#					say "BCC:        " . join ',', $envelope->bcc;
+					});
+					$total += $size;
+				} catch { warn "failed: $_" };
+				++$idx;
+			}
+		)->on_fail(sub { warn "failed fetch - @_" })->on_done(sub {
+			printf "Total size: %d\n", $total;
+		});
+#	} while => sub { ++$idx < $status->{messages} };
 #	my $es = Email::Simple->new($msg);
 #	my $hdr = $es->header_obj;
 #	printf("[%03d] %s\n", $idx, $es->header('Subject'));
