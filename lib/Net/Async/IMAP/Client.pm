@@ -1,273 +1,107 @@
 package Net::Async::IMAP::Client;
 use strict;
 use warnings;
-use parent qw(IO::Async::Notifier);
-
-# Net::Async::CassandraCQL
-use Socket;
-our $VERSION = '0.003';
-
-=head1 NAME
-
-Net::Async::IMAP::Client - asynchronous IMAP client based on L<Protocol::IMAP::Client> and L<IO::Async::Protocol::Stream>.
-
-=head1 SYNOPSIS
-
- use IO::Async::Loop;
- use Net::Async::IMAP;
- my $loop = IO::Async::Loop->new;
- my $imap = Net::Async::IMAP::Client->new(
- 	loop => $loop,
-	host => 'mailserver.com',
-	service => 10143, # custom port number example
-	user => 'user@mailserver.com',
-	pass => 'password',
-
-# Automatically retrieve any new messages that arrive on the server
-	on_message_received => sub {
-		my ($self, $id) = @_;
-		$self->fetch($id);
-	},
-
-# Display the subject whenever we have a successful FETCH command
-	on_message => sub {
-		my ($self, $msg) = @_;
-		warn "Had message " . Email::Simple->new($msg)->header('Subject') . "\n";
-	},
- );
- $loop->loop_forever;
-
-=head1 DESCRIPTION
-
-Provides support for communicating with IMAP servers under L<IO::Async>.
-
-See L<Protocol::IMAP> for more details on this implementation of IMAP, and RFC3501
-for the official protocol specification.
-
-=head1 METHODS
-
-=cut
-
-=head2 new
-
-Instantiate a new object.
-
-=cut
-
-sub new {
-	my $class = shift;
-	my %args = @_;
-	my $self = $class->SUPER::new( %args );
-	return $self;
-}
+use parent qw(IO::Async::Stream);
+use IO::Socket::SSL qw(SSL_VERIFY_NONE);
+use IO::Async::SSL;
+use IO::Async::SSLStream;
+use Protocol::IMAP::Client;
+use curry;
+use Future;
+# IO::Async::Notifier
 
 sub _init {
 	my $self = shift;
-	$self->SUPER::_init(@_);
-
-	$self->{idle_timer} = IO::Async::Timer::Countdown->new(
-		delay => 25 * 60,
-		on_expire => $self->_capture_weakself( sub {
-			my $self = shift;
-			$self->done(
-				on_ok => sub {
-					$self->noop(
-						on_ok => sub {
-							$self->idle;
-						}
-					);
-				}
-			);
-		})
+	$self->{protocol} = Protocol::IMAP::Client->new(
+		debug => 0,
+		tls => 1,
 	);
-
-	$self->add_child( $self->{idle_timer} );
+	$self->SUPER::_init(@_)
 }
 
-=head2 on_read_line
+sub protocol { shift->{protocol} }
+sub user { shift->{user} }
+sub pass { shift->{pass} }
 
-Pass any new data into the protocol handler.
-
-=cut
-
-sub on_read_line {
-	my ($self, $line) = @_;
-	$self->debug("Have line [$line]");
-	my $remaining = $self->on_single_line($line);
-	return 1 unless $remaining;
-
-# Switch to multi-line (fixed data size) mode
-	return $self->_capture_weakself(sub {
-		my $self = shift;
-		my ($stream, $buffref, $closed) = @_;
-
-		$self->debug("Have length [" . length($$buffref) . "] expecting $remaining");
-		# Allow buffer to build up until we have the entire response
-		return 0 unless length $$buffref >= $remaining;
-
-		# Extract full buffer and pass it on to the multiline handler
-		my $data = substr($$buffref, 0, $remaining, '');
-		$self->on_multi_line($data);
-
-		# On completion drop back to the previous handler
-		delete $self->{multiline};
-		return undef;
-	});
-}
-
-=head2 configure
-
-Apply callbacks and other parameters, preparing state for event loop start.
-
-=cut
-
-sub configure {
+sub on_read {
 	my $self = shift;
-	my %args = @_;
-
-# Debug flag is used to control the copious amounts of data that we dump out when tracing
-	if(exists $args{debug}) {
-		$self->{debug} = delete $args{debug} ? 1 : 0;
-	}
-
-	# die "No host provided" unless $args{host} || $self->{transport};
-	foreach (qw{host service user pass ssl tls}) {
-		$self->{$_} = delete $args{$_} if exists $args{$_};
-	}
-
-	if( exists $args{idle_timeout} ) {
-		$self->{idle_timer}->configure( delay => delete $args{idle_timeout} );
-	}
-
-#	# Don't think I like this much, but didn't want the list of callbacks held here
-#	%args = $self->Protocol::IMAP::Client::configure(%args);
-#
-	$self->SUPER::configure(%args);
-}
-
-sub on_user { shift->{user} }
-sub on_pass { shift->{pass} }
-
-=head2 on_connection_established
-
-Prepare and activate a new transport.
-
-=cut
-
-sub on_connection_established {
-	my $self = shift;
-	my $sock = shift;
-	my $transport = IO::Async::Stream->new(handle => $sock)
-		or die "No transport?";
-	$self->configure(transport => $transport);
-	$self->debug("Have transport " . $self->transport);
-}
-
-=head2 on_starttls
-
-Upgrade the underlying stream to use TLS.
-
-=cut
-
-sub on_starttls {
-	my $self = shift;
-	$self->debug("Upgrading to TLS");
-
-	require IO::Async::SSLStream;
-
-	my $f = Future->new;
-	$self->SSL_upgrade(
-		on_upgraded => $self->curry::weak::on_tls_upgraded($f),
-		on_error => $f->curry::weak::fail,
-	);
+	my ( $buffref, $closed ) = @_;
+	1 while $self->protocol->on_read($buffref);
+	return 0;
 }
 
 sub on_tls_upgraded {
 	my $self = shift;
-	my $f = shift;
-	$self->debug("TLS upgrade complete");
-
-	$self->{tls_enabled} = 1;
-	$self->get_capabilities;
-}
-
-sub on_tls_upgrade_failure {
-	my $self = shift;
-	my $f = shift;
-	$f->fail(@_);
-}
-
-=head2 start_idle_timer
-
-Restart the idle timer.
-
-=cut
-
-sub start_idle_timer {
-	my $self = shift;
-	my %args = @_;
-
-	$self->{idle_timer}->stop if $self->{idle_timer};
-	$self->{idle_timer}->start;
-	return $self;
-}
-
-=head2 stop_idle_timer
-
-Disable the timer if it's running.
-
-=cut
-
-sub stop_idle_timer {
-	my $self = shift;
-	$self->{idle_timer}->stop if $self->{idle_timer};
-}
-
-=head2 _add_to_loop
-
-Set up the connection automatically when we are added to the loop.
-
-=cut
-
-sub _add_to_loop {
-	my $self = shift;
-	$self->SUPER::_add_to_loop(@_);
-	$self->connect(
-		host    => $self->{host},
-		service => $self->{service},
+	my $sock = shift;
+	warn "we have upgraded our SSLs to $sock\n";
+	$self->protocol->{tls_enabled} = 1;
+	my $stream = IO::Async::SSLStream->new(
+		handle => $sock,
 	);
+	$stream->configure(
+		on_read => sub { shift; $self->on_read(@_) },
+	);
+	$self->add_child($stream);
+	$self->protocol->get_capabilities;
+	$self
 }
 
-=head2 connect
+=head2 on_connected
+
+Transformation to apply once the connection is established.
 
 =cut
+
+sub on_connected {
+	my $self = shift;
+	my $stream = shift;
+	$self->protocol->subscribe_to_event(
+		write => sub {
+			my ($ev, $data) = @_;
+			$stream->write($data);
+		},
+		starttls => sub {
+			my ($ev, $data) = @_;
+			$self->loop->SSL_upgrade(
+				handle => $self->read_handle,
+				SSL_verify_mode => IO::Socket::SSL::SSL_VERIFY_NONE,
+			)->on_done(
+				$self->curry::on_tls_upgraded
+			)->on_fail(sub { warn "upgrade failed: @_" });
+		},
+		authentication_required => sub {
+			my ($ev) = @_;
+			$self->protocol->login(
+				$self->user,
+				$self->pass,
+			);
+		},
+		authenticated => $self->authenticated->curry::done($self),
+	);
+	$self->protocol->state('ConnectionEstablished');
+	$self
+}
 
 sub connect {
 	my $self = shift;
 	my %args = @_;
-
-	my $on_connected = delete $args{on_connected};
-#	$self->state('ConnectionClosed');
-	my $host = exists $args{host} ? delete $args{host} : $self->{host};
+	$self->{$_} = delete $args{$_} for grep exists $args{$_}, qw(user pass);
 	$self->SUPER::connect(
-		# Default value
-		service		=> 'imap2',
-		%args,
-		host		=> $host,
-		socktype	=> SOCK_STREAM,
-#		on_resolve_error => sub {
-#			die "Resolution failed for $host";
-#		},
-#		on_connect_error => sub {
-#			die "Could not connect to $host";
-#		},
-#		on_connected => sub {
-#			my ($self, $sock) = @_;
-#			$self->state(ConnectionEstablished => $self->transport->read_handle);
-#			$on_connected->($self) if $on_connected;
-#		}
+		socktype => 'stream',
+		service => 'imap2',
+		%args
+	)->transform(
+		done => $self->curry::on_connected,
 	);
 }
+
+sub authenticated { shift->{authenticated} ||= Future->new }
+
+# proxy methods
+sub status { $_[0]->protocol->status(@_[1..$#_]) }
+sub select : method { $_[0]->protocol->select(@_[1..$#_]) }
+sub fetch : method { $_[0]->protocol->fetch(@_[1..$#_]) }
+sub list : method { $_[0]->protocol->list(@_[1..$#_]) }
 
 1;
 
