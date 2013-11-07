@@ -156,15 +156,17 @@ vbox {
 
 $imap = Net::Async::IMAP::Client->new;
 loop->add($imap);
+use Getopt::Long;
+GetOptions(
+	'user=s' => \my $user,
+	'pass=s' => \my $pass,
+	'host=s' => \my $host,
+);
 $imap->connect(
-	user     => 'tom@audioboundary.com',
-	pass     => 'd3m0n1c',
-	host     => 'audioboundary.com',
+	user     => $user,
+	pass     => $pass,
+	host     => $host,
 	service  => 'imap2',
-#	user     => 'trendeu\\tom_molesworth',
-#	pass     => 'PhuSee2v',
-#	host     => 'localhost',
-#	service  => '9143',
 	socktype => 'stream',
 )->on_done(sub {
 	my $imap = shift;

@@ -3,6 +3,7 @@ use strict;
 use warnings;
 use 5.010;
 package main;
+use Net::Async::IMAP::Client;
 use IO::Async::Loop;
 use Email::Simple;
 use Try::Tiny;
@@ -14,18 +15,20 @@ use Encode::MIME::EncWords;
 binmode STDOUT, ':encoding(UTF-8)';
 binmode STDERR, ':encoding(UTF-8)';
 
+use Getopt::Long;
+GetOptions(
+	'user=s' => \my $user,
+	'pass=s' => \my $pass,
+	'host=s' => \my $host,
+);
 my $loop = IO::Async::Loop->new;
 my $imap = Net::Async::IMAP::Client->new;
 $loop->add($imap);
 $imap->connect(
-	user     => 'tom@audioboundary.com',
-	pass     => 'd3m0n1c',
-	host     => 'audioboundary.com',
+	user     => $user,
+	pass     => $pass,
+	host     => $host,
 	service  => 'imap2',
-#	user     => 'trendeu\\tom_molesworth',
-#	pass     => 'PhuSee2v',
-#	host     => 'localhost',
-#	service  => '9143',
 	socktype => 'stream',
 )->on_done(sub {
 	my $imap = shift;
@@ -54,7 +57,6 @@ my $f = $imap->authenticated->then(sub {
 	warn "Select complete: @_";
 	my $status = shift;
 	use Data::Dumper; warn Dumper($status);
-#	Future::Utils::repeat {
 	my $total = 0;
 	my $max = $status->{messages} // 27;
 		$imap->fetch(
@@ -89,11 +91,6 @@ my $f = $imap->authenticated->then(sub {
 		)->on_fail(sub { warn "failed fetch - @_" })->on_done(sub {
 			printf "Total size: %d\n", $total;
 		});
-#	} while => sub { ++$idx < $status->{messages} };
-#	my $es = Email::Simple->new($msg);
-#	my $hdr = $es->header_obj;
-#	printf("[%03d] %s\n", $idx, $es->header('Subject'));
-#	printf(" - %s\n", join(',', $hdr->header_names));
 })->on_fail(sub { die "Failed - @_" })->on_done(sub { $loop->stop });
 $loop->later(sub { DB::enable_profile() }) if $INC{'Devel/NYTProf.pm'};
 $loop->run;
