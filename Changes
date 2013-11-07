@@ -1,5 +1,10 @@
 {{$NEXT}}
 
+0.004     2013-11-07 20:19:47 Europe/London
+	New features:
+	* Now uses a separate Protocol::IMAP instance rather than subclassing
+	* Protocol::IMAP 0.004 support, allowing FETCH parsing
+
 0.003     2011-01-19 23:32:58 Europe/London
 	Support perl5.8 and update IO::Async minimum version required to 0.36 since we're relying on LineStream now.
 
