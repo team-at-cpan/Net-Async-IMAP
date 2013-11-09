@@ -65,10 +65,12 @@ my $f = $imap->authenticated->then(sub {
 			# type => 'RFC822.HEADER',
 			# type => 'BODY',
 			# type => 'BODY[]',
-			type => 'ALL',
-#			type => '(FLAGS INTERNALDATE RFC822.SIZE ENVELOPE BODY[])',
+			# type => 'ALL',
+			type => '(FLAGS INTERNALDATE RFC822.SIZE ENVELOPE BODY[])',
+			type => '(FLAGS INTERNALDATE RFC822.SIZE ENVELOPE)',
 			on_fetch => sub {
 				my $msg = shift;
+				warn "fetching!";
 
 				try {
 					my $size = $msg->data('size')->get;
@@ -91,7 +93,11 @@ my $f = $imap->authenticated->then(sub {
 		)->on_fail(sub { warn "failed fetch - @_" })->on_done(sub {
 			printf "Total size: %d\n", $total;
 		});
-})->on_fail(sub { die "Failed - @_" })->on_done(sub { $loop->stop });
+})->on_fail(sub {
+	warn "Failed - @_"
+})->on_done(sub {
+	$loop->stop
+});
 $loop->later(sub { DB::enable_profile() }) if $INC{'Devel/NYTProf.pm'};
 $loop->run;
 DB::disable_profile() if $INC{'Devel/NYTProf.pm'};
