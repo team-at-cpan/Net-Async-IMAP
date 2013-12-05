@@ -2,6 +2,7 @@ package Net::Async::IMAP::Client;
 use strict;
 use warnings;
 use parent qw(IO::Async::Stream);
+
 use IO::Socket::SSL qw(SSL_VERIFY_NONE);
 use IO::Async::SSL;
 use IO::Async::SSLStream;
@@ -10,18 +11,28 @@ use curry;
 use Future;
 # IO::Async::Notifier
 
-sub _init {
+sub configure {
 	my $self = shift;
-	$self->{protocol} = Protocol::IMAP::Client->new(
-		debug => 0,
-		tls => 1,
-	);
-	$self->SUPER::_init(@_)
+	my %args = @_;
+	$self->{debug} = delete $args{debug} if exists $args{debug};
+	warn "debug was set: " . $self->{debug};
+	$self->SUPER::configure(%args);
 }
 
-sub protocol { shift->{protocol} }
+sub protocol {
+	my $self = shift;
+	unless($self->{protocol}) {
+		$self->{protocol} = Protocol::IMAP::Client->new(
+			debug => $self->is_debug,
+			tls => 1,
+		);
+	}
+	return $self->{protocol};
+}
+
 sub user { shift->{user} }
 sub pass { shift->{pass} }
+sub is_debug { shift->{debug} ? 1 : 0 }
 
 sub on_read {
 	my $self = shift;

@@ -22,7 +22,9 @@ GetOptions(
 	'host=s' => \my $host,
 );
 my $loop = IO::Async::Loop->new;
-my $imap = Net::Async::IMAP::Client->new;
+my $imap = Net::Async::IMAP::Client->new(
+	debug => 1,
+);
 $loop->add($imap);
 $imap->connect(
 	user     => $user,
