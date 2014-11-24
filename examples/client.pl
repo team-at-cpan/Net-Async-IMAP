@@ -21,11 +21,15 @@ GetOptions(
 	'pass=s' => \my $pass,
 	'host=s' => \my $host,
 );
+
+DB::disable_profile() if $INC{'Devel/NYTProf.pm'};
 my $loop = IO::Async::Loop->new;
 my $imap = Net::Async::IMAP::Client->new(
 	debug => 1,
 );
 $loop->add($imap);
+
+# This does a blocking connect, just to demonstrate ->get
 $imap->connect(
 	user     => $user,
 	pass     => $pass,
@@ -40,7 +44,8 @@ $imap->connect(
 #	)->on_done(sub { warn "upgraded!" })->on_fail(sub { warn "failed: @_" });
 })->on_fail(sub {
 	warn "Failed to connect: @_\n"
-});
+})->get;
+
 my $idx = 1;
 my $f = $imap->authenticated->then(sub {
 	warn "Authentication seems to have finished";
@@ -100,6 +105,11 @@ my $f = $imap->authenticated->then(sub {
 })->on_done(sub {
 	$loop->stop
 });
+
+# And here's where we start the loop - if Devel::NYTProf is loaded, we'll
+# start it once the event loop is active to avoid the resolver fork
+# interfering with the resulting profile output (symptoms include
+# corrupt or partial nytprof files)
 $loop->later(sub { DB::enable_profile() }) if $INC{'Devel/NYTProf.pm'};
 $loop->run;
 DB::disable_profile() if $INC{'Devel/NYTProf.pm'};
