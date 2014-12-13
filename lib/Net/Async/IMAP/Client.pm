@@ -132,6 +132,10 @@ sub on_connected {
 	$self
 }
 
+=head2 connect
+
+=cut
+
 sub connect {
 	my $self = shift;
 	my %args = @_;
@@ -145,13 +149,40 @@ sub connect {
 	);
 }
 
-sub authenticated { shift->{authenticated} ||= Future->new }
+=head2 authenticated
+
+=cut
+
+sub authenticated {
+	my ($self) = @_;
+	$self->{authenticated} ||= $self->loop->new_future
+}
 
 # proxy methods
+
+=head2 status
+
+=cut
+
 sub status { $_[0]->protocol->status(@_[1..$#_]) }
+
+=head2 select
+
+=cut
+
 sub select : method { $_[0]->protocol->select(@_[1..$#_]) }
-sub fetch : method { $_[0]->protocol->fetch(@_[1..$#_]) }
-sub list : method { $_[0]->protocol->list(@_[1..$#_]) }
+
+=head2 fetch
+
+=cut
+
+sub fetch { $_[0]->protocol->fetch(@_[1..$#_]) }
+
+=head2 list
+
+=cut
+
+sub list { $_[0]->protocol->list(@_[1..$#_]) }
 
 1;
 
@@ -163,5 +194,5 @@ Tom Molesworth <cpan@perlsite.co.uk>
 
 =head1 LICENSE
 
-Copyright Tom Molesworth 2010-2013. Licensed under the same terms as Perl itself.
+Copyright Tom Molesworth 2010-2014. Licensed under the same terms as Perl itself.
 
