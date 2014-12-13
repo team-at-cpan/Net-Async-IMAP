@@ -5,6 +5,33 @@ use warnings;
 
 use parent qw(IO::Async::Stream);
 
+=head1 NAME
+
+Net::Async::IMAP::Client - asynchronous IMAP client based on L<Protocol::IMAP::Client>
+
+=head1 SYNOPSIS
+
+ use IO::Async::Loop;
+ use Net::Async::IMAP;
+ my $loop = IO::Async::Loop->new;
+ $loop->add(my $imap = Net::Async::IMAP::Client->new(
+	host => 'mailserver.com',
+	service => 'imap2',
+	on_authenticated => sub {
+		warn "login was successful";
+		$loop->loop_stop;
+	},
+ ));
+ $imap->login(
+	user => 'user@mailserver.com',
+	pass => 'password',
+ );
+ $loop->loop_forever;
+
+=head1 DESCRIPTION
+
+=cut
+
 use IO::Socket::SSL qw(SSL_VERIFY_NONE);
 use IO::Async::SSL;
 use IO::Async::SSLStream;
