@@ -51,6 +51,8 @@ my $_curry_weak = sub {
 	}
 };
 
+=head1 METHODS
+
 =head2 configure
 
 =cut
