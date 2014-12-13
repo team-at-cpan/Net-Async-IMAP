@@ -30,6 +30,30 @@ Net::Async::IMAP::Client - asynchronous IMAP client based on L<Protocol::IMAP::C
 
 =head1 DESCRIPTION
 
+=head1 USAGE
+
+First, instantiate the object and attach it to an L<IO::Async::Loop> instance:
+
+ $loop->add(
+  my $imap_client = Net::Async::IMAP::Client->new
+ );
+
+Next, request a connection to the server. This will resolve when the connection
+is ready:
+
+ $imap_client->connect(
+  ...
+ )->get;
+
+Note that the IMAP connection has been established but we may not have completed
+the authentication process yet. If you need to ensure that authentication is also
+finished, use the L</authentication> method:
+
+ $imap_client->authentication->get;
+
+Normally this is not required - all IMAP requests made via methods in this module
+will automatically wait for authentication.
+
 =cut
 
 use IO::Socket::SSL qw(SSL_VERIFY_NONE);
