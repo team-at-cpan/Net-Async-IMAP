@@ -42,6 +42,7 @@ my $_curry_weak = sub {
 sub protocol {
 	my $self = shift;
 	unless($self->{protocol}) {
+		$self->debug_printf('Instantiating new IMAP protocol object for client');
 		$self->{protocol} = Protocol::IMAP::Client->new(
 			debug => $self->curry::weak::debug_printf,
 			tls   => 1,
