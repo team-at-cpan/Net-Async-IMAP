@@ -1,56 +1,95 @@
 package Net::Async::IMAP::Client;
+
 use strict;
 use warnings;
+
 use parent qw(IO::Async::Stream);
 
 use IO::Socket::SSL qw(SSL_VERIFY_NONE);
 use IO::Async::SSL;
 use IO::Async::SSLStream;
-use Protocol::IMAP::Client;
 use curry;
 use Future;
-# IO::Async::Notifier
 
-sub configure {
-	my $self = shift;
-	my %args = @_;
-	$self->{debug} = delete $args{debug} if exists $args{debug};
-	warn "debug was set: " . $self->{debug};
-	$self->SUPER::configure(%args);
-}
+use Protocol::IMAP::Client;
+use Scalar::Util;
+
+my $_curry_weak = sub {
+	my ($invocant, $code) = splice @_, 0, 2;
+	Scalar::Util::weaken($invocant) if Scalar::Util::blessed($invocant);
+	my @args = @_;
+	sub {
+		return unless $invocant;
+		$invocant->$code(@args => @_)
+	}
+};
+
+=head2 configure
+
+=cut
+
+#sub configure {
+#	my $self = shift;
+#	my %args = @_;
+#	$self->{debug} = delete $args{debug} if exists $args{debug};
+#	$self->SUPER::configure(%args);
+#}
+
+=head2 protocol
+
+=cut
 
 sub protocol {
 	my $self = shift;
 	unless($self->{protocol}) {
 		$self->{protocol} = Protocol::IMAP::Client->new(
-			debug => $self->is_debug,
-			tls => 1,
+			debug => $self->curry::weak::debug_printf,
+			tls   => 1,
 		);
 	}
-	return $self->{protocol};
+	$self->{protocol}
 }
 
+=head2 user
+
+=cut
+
 sub user { shift->{user} }
+
+=head2 pass
+
+=cut
+
 sub pass { shift->{pass} }
-sub is_debug { shift->{debug} ? 1 : 0 }
+
+=head2 on_read
+
+=cut
 
 sub on_read {
-	my $self = shift;
-	my ( $buffref, $closed ) = @_;
+	my ($self, $buffref, $closed) = @_;
 	1 while $self->protocol->on_read($buffref);
 	return 0;
 }
 
+=head2 on_tls_upgraded
+
+=cut
+
 sub on_tls_upgraded {
-	my $self = shift;
-	my $sock = shift;
-	warn "we have upgraded our SSLs to $sock\n";
+	my ($self, $sock) = @_;
+	$self->debug_printf("TLS upgrade complete");
 	$self->protocol->{tls_enabled} = 1;
+
 	my $stream = IO::Async::SSLStream->new(
 		handle => $sock,
 	);
 	$stream->configure(
-		on_read => sub { shift; $self->on_read(@_) },
+		on_read => $self->$_curry_weak(sub {
+			# Throw away $stream, we don't need it
+			my ($self) = splice @_, 0, 2;
+			$self->on_read(@_)
+		}),
 	);
 	$self->add_child($stream);
 	$self->protocol->get_capabilities;
