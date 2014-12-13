@@ -39,7 +39,7 @@ See the L<Net::Async::IMAP::Client> or L<Net::Async::IMAP::Server> subclasses fo
 
 =head1 AUTHOR
 
-Tom Molesworth <net-async-imap@perlsite.co.uk>
+Tom Molesworth <cpan@perlsite.co.uk>
 
 with thanks to Paul Evans <leonerd@leonerd.co.uk> for the L<IO::Async> framework and
 improvements to the initial implementation of this module.

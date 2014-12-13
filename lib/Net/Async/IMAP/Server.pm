@@ -160,7 +160,7 @@ __END__
 
 =head1 AUTHOR
 
-Tom Molesworth <net-async-imap@perlsite.co.uk>
+Tom Molesworth <cpan@perlsite.co.uk>
 
 =head1 LICENSE
 
