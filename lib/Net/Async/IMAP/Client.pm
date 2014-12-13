@@ -198,7 +198,7 @@ sub connect {
 
 	$self->SUPER::connect(
 		socktype => 'stream',
-		# Although we support IMAP4bis, the IETF-assiged servicename is still 'imap2'
+		# Although we support IMAP4bis, the IETF-assigned servicename is still 'imap2'
 		service => 'imap2',
 		%args
 	)->transform(
