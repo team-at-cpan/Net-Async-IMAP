@@ -104,8 +104,8 @@ Transformation to apply once the connection is established.
 =cut
 
 sub on_connected {
-	my $self = shift;
-	my $stream = shift;
+	my ($self, $stream) = @_;
+	$self->debug_printf('Connection established');
 	$self->protocol->subscribe_to_event(
 		write => sub {
 			my ($ev, $data) = @_;
