@@ -129,6 +129,7 @@ sub on_connected {
 		},
 		authenticated => $self->authenticated->curry::done($self),
 	);
+
 	$self->protocol->state('ConnectionEstablished');
 	$self
 }
@@ -141,8 +142,10 @@ sub connect {
 	my $self = shift;
 	my %args = @_;
 	$self->{$_} = delete $args{$_} for grep exists $args{$_}, qw(user pass);
+
 	$self->SUPER::connect(
 		socktype => 'stream',
+		# Although we support IMAP4bis, the IETF-assiged servicename is still 'imap2'
 		service => 'imap2',
 		%args
 	)->transform(
@@ -152,6 +155,9 @@ sub connect {
 
 =head2 authenticated
 
+Returns a L<Future> which resolves once authentication
+is complete.
+
 =cut
 
 sub authenticated {
@@ -159,9 +165,15 @@ sub authenticated {
 	$self->{authenticated} ||= $self->loop->new_future
 }
 
-# proxy methods
+=head1 PROXY METHODS
+
+These methods are passed through to the underlying
+L<Protocol::IMAP::Client> instance. See the documentation
+there for further information.
 
 =head2 status
+
+L<Protocol::IMAP::Client/status>
 
 =cut
 
@@ -169,17 +181,23 @@ sub status { $_[0]->protocol->status(@_[1..$#_]) }
 
 =head2 select
 
+L<Protocol::IMAP::Client/select>
+
 =cut
 
 sub select : method { $_[0]->protocol->select(@_[1..$#_]) }
 
 =head2 fetch
 
+L<Protocol::IMAP::Client/fetch>
+
 =cut
 
 sub fetch { $_[0]->protocol->fetch(@_[1..$#_]) }
 
 =head2 list
+
+L<Protocol::IMAP::Client/list>
 
 =cut
 
