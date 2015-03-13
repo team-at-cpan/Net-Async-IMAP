@@ -1,4 +1,5 @@
 package Net::Async::IMAP::Server;
+
 use strict;
 use warnings;
 use parent qw{IO::Async::Protocol::Stream Protocol::IMAP::Server};

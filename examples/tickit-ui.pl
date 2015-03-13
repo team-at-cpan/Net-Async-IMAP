@@ -70,7 +70,7 @@ vbox {
 		  width => '33%';
 		pane {
 			customwidget {
-				my $w = Tickit::Widget::Table::Paged->new;
+				my $w = Tickit::Widget::Table->new;
 				$w->{on_activate} = sub {
 					my ($row, $data) = @_;
 					my $idx = $data->[0];
